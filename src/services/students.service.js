@@ -285,6 +285,41 @@ class StudentService {
       lastTest: lastTestDoc
     };
   }
+
+  async createOrLoginWithGoogle(email, displayName = '') {
+    try {
+      const querySnapshot = await studentCollection.where("email", "==", email).get();
+      
+      if (!querySnapshot.empty) {
+        const studentDoc = querySnapshot.docs[0];
+        const studentData = studentDoc.data();
+        
+        const token = jwt.sign({ id: studentDoc.id, email: studentData.email }, SECRET_KEY, { expiresIn: '1h' });
+        
+        return { 
+          exists: true,
+          token, 
+          student: { 
+            id: studentDoc.id, 
+            email: studentData.email, 
+            firstName: studentData.firstName, 
+            lastName: studentData.lastName, 
+            universityId: studentData.universityId, 
+            placeholder: studentData.placeholder, 
+            approved: studentData.approved, 
+            status: studentData.status 
+          } 
+        };
+      } else {
+        return { 
+          exists: false,
+          message: "User not found, please complete registration."
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
   
 }
 
