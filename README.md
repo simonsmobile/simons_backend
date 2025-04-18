@@ -1,5 +1,5 @@
 # simons_backend
 
-``bash
+```bash
 node index.js
 ```
