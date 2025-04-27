@@ -130,4 +130,21 @@ router.get('/student/:email/tests', async (req, res) => {
   }
 });
 
+
+router.post("/google-auth", async (req, res) => {
+  const { email, displayName } = req.body;
+
+  if (!email) {
+    return res.status(httpStatus.BAD_REQUEST).send({ message: "Email is required" });
+  }
+
+  try {
+    const result = await StudentService.createOrLoginWithGoogle(email, displayName);
+    res.status(httpStatus.OK).send(result);
+  } catch (error) {
+    console.error(error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).send({ message: error.message || "Server error" });
+  }
+});
+
 module.exports = router;
