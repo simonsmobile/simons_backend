@@ -488,61 +488,84 @@ class StudentService {
     const studentRef = studentCollection.doc(studentDoc.id);
     const testsCollectionRef = studentRef.collection("tests");
 
-    const allTestsQuery = await testsCollectionRef
+    // Get the most recent test for grades
+    const lastTestQuery = await testsCollectionRef
       .where("scoringVersion", "==", "2.0")
       .orderBy("timestamp", "desc")
+      .limit(1)
       .get();
 
-    if (allTestsQuery.empty) {
-      return {
-        totalScore: 0,
-        competenceScores: {},
-        completedLevels: {},
-        lastTest: null
-      };
-    }
-
-    const allTests = allTestsQuery.docs.map(doc => doc.data());
-    const lastTest = allTests[0];
+    const lastTest = !lastTestQuery.empty ? lastTestQuery.docs[0].data() : null;
 
     // Calculate total accumulated score
     let totalAccumulatedScore = 0;
     const competenceScores = {};
     const completedLevels = {};
 
-    // Track completed levels per competence
-    const competenceMap = {
-      "1.1": 0, "1.2": 1, "1.3": 2,
-      "2.1": 3, "2.2": 4, "2.3": 5, "2.4": 6, "2.5": 7, "2.6": 8,
-      "3.1": 9, "3.2": 10, "3.3": 11, "3.4": 12,
-      "4.1": 13, "4.2": 14, "4.3": 15, "4.4": 16,
-      "5.1": 17, "5.2": 18, "5.3": 19, "5.4": 20,
-    };
+    // Define all competences
+    const competences = [
+      "1.1", "1.2", "1.3",
+      "2.1", "2.2", "2.3", "2.4", "2.5", "2.6",
+      "3.1", "3.2", "3.3", "3.4",
+      "4.1", "4.2", "4.3", "4.4",
+      "5.1", "5.2", "5.3", "5.4"
+    ];
 
     // Initialize competence tracking
-    Object.keys(competenceMap).forEach(comp => {
+    competences.forEach(comp => {
       competenceScores[comp] = { level1: 0, level2: 0, totalScore: 0 };
       completedLevels[comp] = { level1: false, level2: false };
     });
 
-    // Process all tests to accumulate scores
-    allTests.forEach(test => {
-      if (test.competenceArea && test.level && test.totalScore > 0) {
-        const comp = test.competenceArea;
-        const level = test.level === 'basic' ? 'level1' : 'level2';
-        
-        if (competenceScores[comp]) {
-          // Only update if this score is higher than previous
-          if (test.totalScore > competenceScores[comp][level]) {
-            competenceScores[comp][level] = test.totalScore;
-            completedLevels[comp][level] = true;
-          }
-        }
-      }
+    // For each competence and level, get the latest test
+    const promises = [];
+    
+    competences.forEach(comp => {
+      // Get latest basic level test for this competence
+      promises.push(
+        testsCollectionRef
+          .where("scoringVersion", "==", "2.0")
+          .where("competenceArea", "==", comp)
+          .where("level", "==", "basic")
+          .orderBy("timestamp", "desc")
+          .limit(1)
+          .get()
+          .then(snapshot => {
+            if (!snapshot.empty) {
+              const testData = snapshot.docs[0].data();
+              if (testData.totalScore > 0) {
+                competenceScores[comp].level1 = testData.totalScore;
+                completedLevels[comp].level1 = true;
+              }
+            }
+          })
+      );
+
+      // Get latest master level test for this competence
+      promises.push(
+        testsCollectionRef
+          .where("scoringVersion", "==", "2.0")
+          .where("competenceArea", "==", comp)
+          .where("level", "==", "master")
+          .orderBy("timestamp", "desc")
+          .limit(1)
+          .get()
+          .then(snapshot => {
+            if (!snapshot.empty) {
+              const testData = snapshot.docs[0].data();
+              if (testData.totalScore > 0) {
+                competenceScores[comp].level2 = testData.totalScore;
+                completedLevels[comp].level2 = true;
+              }
+            }
+          })
+      );
     });
 
+    await Promise.all(promises);
+
     // Calculate total score and competence totals
-    Object.keys(competenceScores).forEach(comp => {
+    competences.forEach(comp => {
       const compTotal = competenceScores[comp].level1 + competenceScores[comp].level2;
       competenceScores[comp].totalScore = compTotal;
       totalAccumulatedScore += compTotal;
