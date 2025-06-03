@@ -150,9 +150,9 @@ class StudentService {
       transporter.sendMail(mail_configs, function (error, info) {
         if (error) {
           console.log(error);
-          return reject({ message: `An error has occured` });
+          return reject({ message: `An error has occurred` });
         }
-        return resolve({ message: "Email sent succesfuly" });
+        return resolve({ message: "Email sent successfully" });
       });
     });
   }
@@ -206,9 +206,9 @@ class StudentService {
       transporter.sendMail(mail_configs, function (error, info) {
         if (error) {
           console.log(error);
-          return reject({ message: `An error has occured` });
+          return reject({ message: `An error has occurred` });
         }
-        return resolve({ message: "Email sent succesfuly" });
+        return resolve({ message: "Email sent successfully" });
       });
     });
   }
@@ -240,14 +240,14 @@ class StudentService {
     const studentDoc = querySnapshot.docs[0];
     const studentRef = studentCollection.doc(studentDoc.id);
   
-    // Step 2: Determine the next document number in the 'tests' subcollection
+    // Step 2: Determine the next document number in the 'tests' sub-collection
     const testsCollectionRef = studentRef.collection('tests');
     const testsSnapshot = await testsCollectionRef.get();
   
     const nextTestNumber = testsSnapshot.size + 1;
     const testDocumentName = nextTestNumber.toString();
   
-    // Step 3: Add a new document to the 'tests' subcollection with a timestamp
+    // Step 3: Add a new document to the 'tests' sub-collection with a timestamp
     const newTestRef = testsCollectionRef.doc(testDocumentName);
     await newTestRef.set({
       ...testData,
@@ -333,7 +333,7 @@ class StudentService {
     const studentDoc = querySnapshot.docs[0];
     const studentRef = studentCollection.doc(studentDoc.id);
 
-    // Step 2: Determine the next document number in the 'tests' subcollection
+    // Step 2: Determine the next document number in the 'tests' sub-collection
     const testsCollectionRef = studentRef.collection("tests");
     const testsSnapshot = await testsCollectionRef.get();
 
