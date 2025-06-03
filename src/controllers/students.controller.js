@@ -117,6 +117,31 @@ router.post('/student/:email/tests', async (req, res) => {
   }
 });
 
+router.post('/student/:email/new_tests', async (req, res) => {
+  const { email } = req.params;
+  const testData = req.body;
+
+  try {
+    const newTestDoc = await StudentService.addTestToStudentNew(email, testData);
+    res.status(httpStatus.CREATED).send(newTestDoc);
+  } catch (error) {
+    console.error(error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).send({ message: error.message || 'Failed to create test document' });
+  }
+});
+
+router.get('/student/:email/new_tests', async (req, res) => {
+  const { email } = req.params;
+
+  try {
+    const tests = await StudentService.getTotalAccumulatedScore(email);
+    res.status(httpStatus.OK).send(tests);
+  } catch (error) {
+    console.error(error);
+    res.status(httpStatus.NOT_FOUND).send({ message: error.message || 'Failed to retrieve tests' });
+  }
+});
+
 // Retrieve the first and last test documents
 router.get('/student/:email/tests', async (req, res) => {
   const { email } = req.params;
