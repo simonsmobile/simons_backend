@@ -1,20 +1,24 @@
-// services/student.service.js
-const { Student, studentCollection } = require('../models/student.model');
-const CryptoJS = require('crypto-js');
-const jwt = require('jsonwebtoken');
+const { Student, studentCollection } = require("../models/student.model");
+const CryptoJS = require("crypto-js");
+const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
-const admin = require('firebase-admin');
+const admin = require("firebase-admin");
 
 const SECRET_KEY = "jwt_secret";
 
 class StudentService {
   async createStudent(student) {
     console.log(student);
-    const querySnapshot = await studentCollection.where("email", "==", student.email).get();
+    const querySnapshot = await studentCollection
+      .where("email", "==", student.email)
+      .get();
     if (!querySnapshot.empty) {
       throw new Error("A user already exists under give Email Address");
     }
-    const encryptedPassword = CryptoJS.AES.encrypt(student.password, SECRET_KEY).toString();
+    const encryptedPassword = CryptoJS.AES.encrypt(
+      student.password,
+      SECRET_KEY
+    ).toString();
     const newStudent = {
       email: student.email,
       password: encryptedPassword,
@@ -28,21 +32,26 @@ class StudentService {
       universityId: student.universityId,
       placeholder: student.placeholder,
       approved: student.approved,
-      status: "Not Passed"
+      status: "Not Passed",
     };
     const studentRef = await studentCollection.add(newStudent);
     return { id: studentRef.id, ...newStudent };
   }
 
   async login(email, password) {
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
     if (querySnapshot.empty) {
       throw new Error("Invalid email or password");
     }
 
     const studentDoc = querySnapshot.docs[0];
     const studentData = studentDoc.data();
-    const decryptedPassword = CryptoJS.AES.decrypt(studentData.password, SECRET_KEY).toString(CryptoJS.enc.Utf8);
+    const decryptedPassword = CryptoJS.AES.decrypt(
+      studentData.password,
+      SECRET_KEY
+    ).toString(CryptoJS.enc.Utf8);
 
     if (decryptedPassword !== password) {
       throw new Error("Invalid email or password");
@@ -52,14 +61,30 @@ class StudentService {
       throw new Error("Your Account is not verified");
     }
 
-    const token = jwt.sign({ id: studentDoc.id, email: studentData.email }, SECRET_KEY, { expiresIn: '1h' });
-    return { token, student: { id: studentDoc.id, email: studentData.email, firstName: studentData.firstName, 
-      lastName: studentData.lastName, universityId: studentData.universityId, placeholder: studentData.placeholder, 
-      approved: studentData.approved, status: studentData.status } };
+    const token = jwt.sign(
+      { id: studentDoc.id, email: studentData.email },
+      SECRET_KEY,
+      { expiresIn: "1h" }
+    );
+    return {
+      token,
+      student: {
+        id: studentDoc.id,
+        email: studentData.email,
+        firstName: studentData.firstName,
+        lastName: studentData.lastName,
+        universityId: studentData.universityId,
+        placeholder: studentData.placeholder,
+        approved: studentData.approved,
+        status: studentData.status,
+      },
+    };
   }
 
   async getStudentByEmail(email) {
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
     if (querySnapshot.empty) {
       throw new Error("Student not found");
     }
@@ -72,7 +97,9 @@ class StudentService {
   }
 
   async updateStudentByEmail(email, updates) {
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
     if (querySnapshot.empty) {
       throw new Error("Student not found");
     }
@@ -81,7 +108,10 @@ class StudentService {
     const studentRef = studentCollection.doc(studentDoc.id);
 
     if (updates.password) {
-      updates.password = CryptoJS.AES.encrypt(updates.password, SECRET_KEY).toString();
+      updates.password = CryptoJS.AES.encrypt(
+        updates.password,
+        SECRET_KEY
+      ).toString();
     }
 
     await studentRef.update(updates);
@@ -89,7 +119,9 @@ class StudentService {
   }
 
   async deleteStudentByEmail(email) {
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
     if (querySnapshot.empty) {
       throw new Error("Student not found");
     }
@@ -98,10 +130,10 @@ class StudentService {
     const studentRef = studentCollection.doc(studentDoc.id);
 
     await studentRef.delete();
-    return { id: studentDoc.id, message: 'Student deleted successfully' };
+    return { id: studentDoc.id, message: "Student deleted successfully" };
   }
 
-  async sendEmail( recipient_email, OTP ) {
+  async sendEmail(recipient_email, OTP) {
     return new Promise((resolve, reject) => {
       var transporter = nodemailer.createTransport({
         service: "gmail",
@@ -111,7 +143,7 @@ class StudentService {
         },
       });
       console.log(process.env.MY_EMAIL);
-  
+
       const mail_configs = {
         from: process.env.MY_EMAIL,
         to: recipient_email,
@@ -157,7 +189,7 @@ class StudentService {
     });
   }
 
-  async sendOTP( recipient_email, OTP ) {
+  async sendOTP(recipient_email, OTP) {
     return new Promise((resolve, reject) => {
       var transporter = nodemailer.createTransport({
         service: "gmail",
@@ -167,7 +199,7 @@ class StudentService {
         },
       });
       console.log(process.env.MY_EMAIL);
-  
+
       const mail_configs = {
         from: process.env.MY_EMAIL,
         to: recipient_email,
@@ -188,7 +220,7 @@ class StudentService {
         <a href="" style="font-size:1.4em;color: #00466a;text-decoration:none;font-weight:600">SimONS Application</a>
       </div>
       <p style="font-size:1.1em">Hi,</p>
-      <p>Thank you for choosing SimONS mobile application. Use the following OTP to confirm your account. OTP is valid for Single session</p>
+      <p>Thank you for choosing SimONS. Use the following OTP to confirm your account. OTP is valid for Single session</p>
       <h2 style="background: #00466a;margin: 0 auto;width: max-content;padding: 0 10px;color: #fff;border-radius: 4px;">${OTP}</h2>
       <p style="font-size:0.9em;">Regards,<br />SimONS</p>
       <hr style="border:none;border-top:1px solid #eee" />
@@ -214,8 +246,9 @@ class StudentService {
   }
 
   async resetPassword(email, newPassword) {
-
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
     if (querySnapshot.empty) {
       throw new Error("Student not found");
     }
@@ -223,105 +256,16 @@ class StudentService {
     const studentDoc = querySnapshot.docs[0];
     const studentRef = studentCollection.doc(studentDoc.id);
 
-    const encryptedPassword = CryptoJS.AES.encrypt(newPassword, SECRET_KEY).toString();
+    const encryptedPassword = CryptoJS.AES.encrypt(
+      newPassword,
+      SECRET_KEY
+    ).toString();
     await studentRef.update({ password: encryptedPassword });
 
-    return { id: studentDoc.id, message: 'Password reset successfully' };
+    return { id: studentDoc.id, message: "Password reset successfully" };
   }
 
-  // Test Results
   async addTestToStudent(email, testData) {
-    // Step 1: Fetch the student document by email
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
-    if (querySnapshot.empty) {
-      throw new Error("Student not found");
-    }
-  
-    const studentDoc = querySnapshot.docs[0];
-    const studentRef = studentCollection.doc(studentDoc.id);
-  
-    // Step 2: Determine the next document number in the 'tests' sub-collection
-    const testsCollectionRef = studentRef.collection('tests');
-    const testsSnapshot = await testsCollectionRef.get();
-  
-    const nextTestNumber = testsSnapshot.size + 1;
-    const testDocumentName = nextTestNumber.toString();
-  
-    // Step 3: Add a new document to the 'tests' sub-collection with a timestamp
-    const newTestRef = testsCollectionRef.doc(testDocumentName);
-    await newTestRef.set({
-      ...testData,
-      timestamp: admin.firestore.FieldValue.serverTimestamp() // Add a timestamp field
-    });
-  
-    return { id: newTestRef.id, ...testData };
-  }
-  
-
-  async getFirstAndLastTest(email) {
-    // Step 1: Fetch the student document by email
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
-    if (querySnapshot.empty) {
-      throw new Error("Student not found");
-    }
-  
-    const studentDoc = querySnapshot.docs[0];
-    const studentRef = studentCollection.doc(studentDoc.id);
-  
-    // Step 2: Retrieve the first and last test documents based on the timestamp
-    const testsCollectionRef = studentRef.collection('tests');
-  
-    // Get the first test
-    const firstTestQuery = await testsCollectionRef.orderBy('timestamp').limit(1).get();
-    const firstTestDoc = firstTestQuery.empty ? null : firstTestQuery.docs[0].data();
-  
-    // Get the last test
-    const lastTestQuery = await testsCollectionRef.orderBy('timestamp', 'desc').limit(1).get();
-    const lastTestDoc = lastTestQuery.empty ? null : lastTestQuery.docs[0].data();
-  
-    // Step 3: Return the results
-    return {
-      firstTest: firstTestDoc,
-      lastTest: lastTestDoc
-    };
-  }
-
-  async createOrLoginWithGoogle(email, displayName = '') {
-    try {
-      const querySnapshot = await studentCollection.where("email", "==", email).get();
-      
-      if (!querySnapshot.empty) {
-        const studentDoc = querySnapshot.docs[0];
-        const studentData = studentDoc.data();
-        
-        const token = jwt.sign({ id: studentDoc.id, email: studentData.email }, SECRET_KEY, { expiresIn: '1h' });
-        
-        return { 
-          exists: true,
-          token, 
-          student: { 
-            id: studentDoc.id, 
-            email: studentData.email, 
-            firstName: studentData.firstName, 
-            lastName: studentData.lastName, 
-            universityId: studentData.universityId, 
-            placeholder: studentData.placeholder, 
-            approved: studentData.approved, 
-            status: studentData.status 
-          } 
-        };
-      } else {
-        return { 
-          exists: false,
-          message: "User not found, please complete registration."
-        };
-      }
-    } catch (error) {
-      throw error;
-    }
-  }
-  
-  async addTestToStudentNew(email, testData) {
     // Step 1: Fetch the student document by email
     const querySnapshot = await studentCollection
       .where("email", "==", email)
@@ -340,41 +284,234 @@ class StudentService {
     const nextTestNumber = testsSnapshot.size + 1;
     const testDocumentName = nextTestNumber.toString();
 
-    // Step 3: Process only the essential scoring data
-    const processedTestData = {
-      date: testData.date || new Date().toISOString().split('T')[0],
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      
-      // Essential quiz data
-      grades: testData.grades || [],
-      answers: testData.answers || [],
-      questions: testData.questions || [],
-      
-      // Core scoring metrics
-      totalScore: testData.totalScore || 0,
-      baseScore: testData.baseScore || 0,
-      timeBonus: testData.timeBonus || 0,
-      perfectBonus: testData.perfectBonus || 0,
-      
-      // Performance metrics
-      accuracy: testData.accuracy || 0,
-      correctAnswers: testData.correctAnswers || 0,
-      totalQuestions: testData.totalQuestions || (testData.questions ? testData.questions.length : 21),
-      
-      // Time data
-      timeTaken: testData.timeTaken || [],
-      averageTimePerQuestion: testData.timeTaken && testData.timeTaken.length > 0
-        ? testData.timeTaken.reduce((a, b) => a + b, 0) / testData.timeTaken.length
-        : 0,
-      
-      // Test metadata
-      level: testData.level || 'mixed',
-      competenceArea: testData.competenceArea || 'all',
-      isPerfect: testData.isPerfect || false,
-      scoringVersion: "2.0"
-    };
+    // Step 3: Add a new document to the 'tests' sub-collection with a timestamp
+    const newTestRef = testsCollectionRef.doc(testDocumentName);
+    await newTestRef.set({
+      ...testData,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(), // Add a timestamp field
+    });
 
-    // Step 4: Add the new document to the 'tests' sub-collection
+    return { id: newTestRef.id, ...testData };
+  }
+
+  async resetAllTests(email) {
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
+    if (querySnapshot.empty) {
+      throw new Error("Student not found");
+    }
+    const studentDoc = querySnapshot.docs[0];
+    const testsCollectionRef = studentCollection
+      .doc(studentDoc.id)
+      .collection("tests");
+    const testsSnapshot = await testsCollectionRef.get();
+
+    if (testsSnapshot.empty) {
+      return { message: "No tests to reset." };
+    }
+
+    const batch = admin.firestore().batch();
+    testsSnapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+
+    await studentCollection.doc(studentDoc.id).update({ status: "Not Passed" });
+
+    return { message: `Reset ${testsSnapshot.size} test(s) successfully.` };
+  }
+
+  async getFirstAndLastTest(email) {
+    // Step 1: Fetch the student document by email
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
+    if (querySnapshot.empty) {
+      throw new Error("Student not found");
+    }
+
+    const studentDoc = querySnapshot.docs[0];
+    const studentRef = studentCollection.doc(studentDoc.id);
+
+    // Step 2: Retrieve the first and last test documents based on the timestamp
+    const testsCollectionRef = studentRef.collection("tests");
+
+    // Get the first test
+    const firstTestQuery = await testsCollectionRef
+      .orderBy("timestamp")
+      .limit(1)
+      .get();
+    const firstTestDoc = firstTestQuery.empty
+      ? null
+      : firstTestQuery.docs[0].data();
+
+    // Get the last test
+    const lastTestQuery = await testsCollectionRef
+      .orderBy("timestamp", "desc")
+      .limit(1)
+      .get();
+    const lastTestDoc = lastTestQuery.empty
+      ? null
+      : lastTestQuery.docs[0].data();
+
+    // Step 3: Return the results
+    return {
+      firstTest: firstTestDoc,
+      lastTest: lastTestDoc,
+    };
+  }
+
+  async createOrLoginWithGoogle(email, displayName = "") {
+    try {
+      const querySnapshot = await studentCollection
+        .where("email", "==", email)
+        .get();
+
+      if (!querySnapshot.empty) {
+        const studentDoc = querySnapshot.docs[0];
+        const studentData = studentDoc.data();
+
+        const token = jwt.sign(
+          { id: studentDoc.id, email: studentData.email },
+          SECRET_KEY,
+          { expiresIn: "1h" }
+        );
+
+        return {
+          exists: true,
+          token,
+          student: {
+            id: studentDoc.id,
+            email: studentData.email,
+            firstName: studentData.firstName,
+            lastName: studentData.lastName,
+            universityId: studentData.universityId,
+            placeholder: studentData.placeholder,
+            approved: studentData.approved,
+            status: studentData.status,
+          },
+        };
+      } else {
+        return {
+          exists: false,
+          message: "User not found, please complete registration.",
+        };
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async addTestToStudentNew(email, testData) {
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
+    if (querySnapshot.empty) {
+      throw new Error("Student not found");
+    }
+
+    const studentDoc = querySnapshot.docs[0];
+    const studentRef = studentCollection.doc(studentDoc.id);
+    const testsCollectionRef = studentRef.collection("tests");
+    const testsSnapshot = await testsCollectionRef.get();
+    const nextTestNumber = testsSnapshot.size + 1;
+    const testDocumentName = nextTestNumber.toString();
+
+    let processedTestData;
+
+    // Logic for pre-assessment
+    if (testData.type === "pre-assessment") {
+      let totalScore = 0;
+      const pointMapping = { C: 100, M: 50, B: 25, F: 0 };
+
+      if (testData.grades && testData.grades.length > 0) {
+        totalScore = testData.grades.reduce(
+          (sum, grade) => sum + (pointMapping[grade] || 0),
+          0
+        );
+      }
+
+      processedTestData = {
+        date: testData.date || new Date().toISOString().split("T")[0],
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        type: "pre-assessment",
+        grades: testData.grades || [],
+        answers: testData.answers || [],
+        questions: testData.questions || [],
+        totalScore: totalScore,
+        scoringVersion: "2.0",
+      };
+    } else {
+      // Logic for timed quizzes
+      // Get the latest grades to update them
+      const lastTestQuery = await testsCollectionRef
+        .orderBy("timestamp", "desc")
+        .limit(1)
+        .get();
+      let currentGrades = Array(21).fill("F");
+      if (!lastTestQuery.empty) {
+        currentGrades =
+          lastTestQuery.docs[0].data().grades || Array(21).fill("F");
+      }
+
+      const competenceMap = {
+        1.1: 0,
+        1.2: 1,
+        1.3: 2,
+        2.1: 3,
+        2.2: 4,
+        2.3: 5,
+        2.4: 6,
+        2.5: 7,
+        2.6: 8,
+        3.1: 9,
+        3.2: 10,
+        3.3: 11,
+        3.4: 12,
+        4.1: 13,
+        4.2: 14,
+        4.3: 15,
+        4.4: 16,
+        5.1: 17,
+        5.2: 18,
+        5.3: 19,
+        5.4: 20,
+      };
+      const competenceIndex = competenceMap[testData.competenceArea];
+
+      const getGradeValue = (grade) => ({ F: 0, B: 1, M: 2, C: 3 }[grade] || 0);
+
+      if (competenceIndex !== undefined && testData.newGrade) {
+        const existingGradeValue = getGradeValue(
+          currentGrades[competenceIndex]
+        );
+        const newGradeValue = getGradeValue(testData.newGrade);
+        if (newGradeValue > existingGradeValue) {
+          currentGrades[competenceIndex] = testData.newGrade;
+        }
+      }
+
+      processedTestData = {
+        date: testData.date || new Date().toISOString().split("T")[0],
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        type: "quiz",
+        grades: currentGrades,
+        answers: testData.answers || [],
+        questions: testData.questions || [],
+        competenceArea: testData.competenceArea,
+        level: testData.level,
+        totalScore: testData.totalScore || 0,
+        baseScore: testData.baseScore || 0,
+        timeBonus: testData.timeBonus || 0,
+        perfectBonus: testData.perfectBonus || 0,
+        accuracy: testData.accuracy || 0,
+        isPerfect: testData.isPerfect || false,
+        scoringVersion: "2.0",
+      };
+    }
+
     const newTestRef = testsCollectionRef.doc(testDocumentName);
     await newTestRef.set(processedTestData);
 
@@ -479,7 +616,9 @@ class StudentService {
   }
 
   async getTotalAccumulatedScore(email) {
-    const querySnapshot = await studentCollection.where("email", "==", email).get();
+    const querySnapshot = await studentCollection
+      .where("email", "==", email)
+      .get();
     if (querySnapshot.empty) {
       throw new Error("Student not found");
     }
@@ -487,88 +626,130 @@ class StudentService {
     const studentDoc = querySnapshot.docs[0];
     const studentRef = studentCollection.doc(studentDoc.id);
     const testsCollectionRef = studentRef.collection("tests");
+    const testsSnapshot = await testsCollectionRef.get();
 
-    // Get the most recent test for grades
+    if (testsSnapshot.empty) {
+      return {
+        totalScore: 0,
+        competenceScores: {},
+        completedLevels: {},
+        lastTest: null,
+        grades: Array(21).fill("F"),
+        allLevelsComplete: false,
+      };
+    }
+
+    // Process all tests to find the latest for each quiz type and the pre-assessment
+    const preAssessmentTest = testsSnapshot.docs
+      .find((doc) => doc.data().type === "pre-assessment")
+      ?.data();
+    const latestQuizzes = {};
+
+    testsSnapshot.docs.forEach((doc) => {
+      const testData = doc.data();
+      if (testData.type === "quiz") {
+        const key = `${testData.competenceArea}-${testData.level}`;
+        if (
+          !latestQuizzes[key] ||
+          testData.timestamp.toMillis() >
+            latestQuizzes[key].timestamp.toMillis()
+        ) {
+          latestQuizzes[key] = testData;
+        }
+      }
+    });
+
+    const quizzes = Object.values(latestQuizzes);
+    const totalQuizScore = quizzes.reduce(
+      (sum, quiz) => sum + (quiz.totalScore || 0),
+      0
+    );
+    const preAssessmentScore = preAssessmentTest?.totalScore || 0;
+    const totalAccumulatedScore = totalQuizScore + preAssessmentScore;
+
     const lastTestQuery = await testsCollectionRef
-      .where("scoringVersion", "==", "2.0")
       .orderBy("timestamp", "desc")
       .limit(1)
       .get();
-
     const lastTest = !lastTestQuery.empty ? lastTestQuery.docs[0].data() : null;
+    const latestGrades = lastTest?.grades || Array(21).fill("F");
 
-    // Calculate total accumulated score
-    let totalAccumulatedScore = 0;
+    const competences = [
+      "1.1",
+      "1.2",
+      "1.3",
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.5",
+      "2.6",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "4.1",
+      "4.2",
+      "4.3",
+      "4.4",
+      "5.1",
+      "5.2",
+      "5.3",
+      "5.4",
+    ];
     const competenceScores = {};
     const completedLevels = {};
+    const preAssessmentPointMapping = { C: 100, M: 50, B: 25, F: 0 };
+    let allLevelsComplete = true;
 
-    // Define all competences
-    const competences = [
-      "1.1", "1.2", "1.3",
-      "2.1", "2.2", "2.3", "2.4", "2.5", "2.6",
-      "3.1", "3.2", "3.3", "3.4",
-      "4.1", "4.2", "4.3", "4.4",
-      "5.1", "5.2", "5.3", "5.4"
-    ];
-
-    // Initialize competence tracking
-    competences.forEach(comp => {
+    // Initialize tracking
+    competences.forEach((comp) => {
       competenceScores[comp] = { level1: 0, level2: 0, totalScore: 0 };
-      completedLevels[comp] = { level1: false, level2: false };
+      completedLevels[comp] = {
+        level1: { taken: false, perfected: false },
+        level2: { taken: false, perfected: false },
+      };
     });
 
-    // For each competence and level, get the latest test
-    const promises = [];
-    
-    competences.forEach(comp => {
-      // Get latest basic level test for this competence
-      promises.push(
-        testsCollectionRef
-          .where("scoringVersion", "==", "2.0")
-          .where("competenceArea", "==", comp)
-          .where("level", "==", "basic")
-          .orderBy("timestamp", "desc")
-          .limit(1)
-          .get()
-          .then(snapshot => {
-            if (!snapshot.empty) {
-              const testData = snapshot.docs[0].data();
-              if (testData.totalScore > 0) {
-                competenceScores[comp].level1 = testData.totalScore;
-                completedLevels[comp].level1 = true;
-              }
-            }
-          })
-      );
+    // Populate from pre-assessment
+    if (preAssessmentTest) {
+      (preAssessmentTest.grades || []).forEach((grade, index) => {
+        const comp = competences[index];
+        if (comp) {
+          competenceScores[comp].level1 +=
+            preAssessmentPointMapping[grade] || 0;
+          if (grade === "C") {
+            completedLevels[comp].level1.perfected = true;
+          }
+        }
+      });
+    }
 
-      // Get latest master level test for this competence
-      promises.push(
-        testsCollectionRef
-          .where("scoringVersion", "==", "2.0")
-          .where("competenceArea", "==", comp)
-          .where("level", "==", "master")
-          .orderBy("timestamp", "desc")
-          .limit(1)
-          .get()
-          .then(snapshot => {
-            if (!snapshot.empty) {
-              const testData = snapshot.docs[0].data();
-              if (testData.totalScore > 0) {
-                competenceScores[comp].level2 = testData.totalScore;
-                completedLevels[comp].level2 = true;
-              }
-            }
-          })
+    // Populate from latest quizzes
+    quizzes.forEach((quiz) => {
+      const comp = quiz.competenceArea;
+      const levelKey = quiz.level === "basic" ? "level1" : "level2";
+
+      competenceScores[comp][levelKey] = Math.max(
+        competenceScores[comp][levelKey],
+        quiz.totalScore
       );
+      completedLevels[comp][levelKey].taken = true;
+      if (quiz.isPerfect) {
+        completedLevels[comp][levelKey].perfected = true;
+      }
     });
 
-    await Promise.all(promises);
-
-    // Calculate total score and competence totals
-    competences.forEach(comp => {
-      const compTotal = competenceScores[comp].level1 + competenceScores[comp].level2;
-      competenceScores[comp].totalScore = compTotal;
-      totalAccumulatedScore += compTotal;
+    // Final check for completion and total scores
+    competences.forEach((comp) => {
+      competenceScores[comp].totalScore =
+        competenceScores[comp].level1 + competenceScores[comp].level2;
+      if (
+        !completedLevels[comp].level1.perfected ||
+        !completedLevels[comp].level2.perfected
+      ) {
+        allLevelsComplete = false;
+      }
     });
 
     return {
@@ -576,7 +757,8 @@ class StudentService {
       competenceScores,
       completedLevels,
       lastTest,
-      grades: lastTest?.grades || Array(21).fill("F")
+      grades: latestGrades,
+      allLevelsComplete,
     };
   }
 }

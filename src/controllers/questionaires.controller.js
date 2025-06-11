@@ -1,4 +1,3 @@
-// controllers/questionnaire.controller.js
 const express = require('express');
 const httpStatus = require('http-status');
 const QuestionnaireService = require('../services/questionaires.service');

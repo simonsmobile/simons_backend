@@ -1,4 +1,3 @@
-// controllers/student.controller.js
 const express = require('express');
 const httpStatus = require('http-status');
 const StudentService = require('../services/students.service');
@@ -9,7 +8,6 @@ router.post("/register", async (req, res) => {
   console.log(req.body);
   const { email, password, firstName, lastName, fullName, gender, dob, university, universityId, address, country, placeholder } = req.body;
   const student = { email, password, firstName, lastName, fullName, gender, dob, university, universityId, address, country, placeholder, approved: false };
-  // console.log(student)
   try {
     const newStudent = await StudentService.createStudent(student);
     res.status(httpStatus.CREATED).send(newStudent);
@@ -104,6 +102,17 @@ router.delete('/student/:email', async (req, res) => {
   }
 });
 
+router.delete('/student/:email/tests/reset', async (req, res) => {
+  const { email } = req.params;
+  try {
+    await StudentService.resetAllTests(email);
+    res.status(httpStatus.OK).send({ message: "All test data has been reset." });
+  } catch (error) {
+    console.error(error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).send({ message: error.message || 'Failed to reset test data.' });
+  }
+});
+
 router.post('/student/:email/tests', async (req, res) => {
   const { email } = req.params;
   const testData = req.body;
@@ -142,7 +151,6 @@ router.get('/student/:email/new_tests', async (req, res) => {
   }
 });
 
-// Retrieve the first and last test documents
 router.get('/student/:email/tests', async (req, res) => {
   const { email } = req.params;
 

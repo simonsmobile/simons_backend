@@ -1,4 +1,3 @@
-// services/report.service.js
 const { Report, reportCollection } = require('../models/report.model');
 
 class ReportService {
