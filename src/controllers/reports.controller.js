@@ -1,4 +1,3 @@
-// controllers/report.controller.js
 const express = require('express');
 const httpStatus = require('http-status');
 const ReportService = require('../services/reports.service');

@@ -1,4 +1,3 @@
-// services/questionnaire.service.js
 const { Questionnaire, questionnaireCollection } = require('../models/questionaire.model');
 
 class QuestionnaireService {

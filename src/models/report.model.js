@@ -1,4 +1,3 @@
-// models/report.model.js
 const firebase = require('../configs/db');
 const firestore = firebase.firestore();
 
