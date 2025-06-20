@@ -415,19 +415,40 @@ class StudentService {
     const studentDoc = querySnapshot.docs[0];
     const studentRef = studentCollection.doc(studentDoc.id);
     const testsCollectionRef = studentRef.collection("tests");
-    const testsSnapshot = await testsCollectionRef.get();
-    const nextTestNumber = testsSnapshot.size + 1;
-    const testDocumentName = nextTestNumber.toString();
 
     let processedTestData;
 
-    // Logic for pre-assessment
-    if (testData.type === "pre-assessment") {
-      let totalScore = 0;
-      const pointMapping = { C: 100, M: 50, B: 25, F: 0 };
+    if (
+      testData.type === "pre-assessment" ||
+      testData.type === "pre-assessment-partial"
+    ) {
+      // Check if pre-assessment already exists
+      const existingPreAssessment = await testsCollectionRef
+        .where("type", "==", "pre-assessment")
+        .limit(1)
+        .get();
 
-      if (testData.grades && testData.grades.length > 0) {
-        totalScore = testData.grades.reduce(
+      let currentGrades = Array(21).fill("F");
+      let existingData = null;
+
+      if (!existingPreAssessment.empty) {
+        existingData = existingPreAssessment.docs[0];
+        currentGrades = existingData.data().grades || Array(21).fill("F");
+      }
+
+      // Merge new grades with existing ones
+      const newGrades = testData.grades || [];
+      for (let i = 0; i < newGrades.length; i++) {
+        if (newGrades[i] && newGrades[i] !== "F") {
+          currentGrades[i] = newGrades[i];
+        }
+      }
+
+      let totalScore = 0;
+      const pointMapping = { C: 500, M: 500, B: 0, F: 0 };
+
+      if (currentGrades && currentGrades.length > 0) {
+        totalScore = currentGrades.reduce(
           (sum, grade) => sum + (pointMapping[grade] || 0),
           0
         );
@@ -437,15 +458,32 @@ class StudentService {
         date: testData.date || new Date().toISOString().split("T")[0],
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
         type: "pre-assessment",
-        grades: testData.grades || [],
+        grades: currentGrades,
         answers: testData.answers || [],
         questions: testData.questions || [],
         totalScore: totalScore,
         scoringVersion: "2.0",
+        category: testData.category || null,
       };
+
+      if (existingData) {
+        // Update existing document
+        await existingData.ref.update(processedTestData);
+        return { id: existingData.id, ...processedTestData };
+      } else {
+        // Create new document
+        const testsSnapshot = await testsCollectionRef.get();
+        const nextTestNumber = testsSnapshot.size + 1;
+        const testDocumentName = nextTestNumber.toString();
+        const newTestRef = testsCollectionRef.doc(testDocumentName);
+        await newTestRef.set(processedTestData);
+        return { id: newTestRef.id, ...processedTestData };
+      }
     } else {
-      // Logic for timed quizzes
-      // Get the latest grades to update them
+      const testsSnapshot = await testsCollectionRef.get();
+      const nextTestNumber = testsSnapshot.size + 1;
+      const testDocumentName = nextTestNumber.toString();
+
       const lastTestQuery = await testsCollectionRef
         .orderBy("timestamp", "desc")
         .limit(1)
@@ -493,6 +531,11 @@ class StudentService {
         }
       }
 
+      let finalTotalScore = 0;
+      if (testData.isPerfect) {
+        finalTotalScore = testData.totalScore || 0;
+      }
+
       processedTestData = {
         date: testData.date || new Date().toISOString().split("T")[0],
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -502,7 +545,7 @@ class StudentService {
         questions: testData.questions || [],
         competenceArea: testData.competenceArea,
         level: testData.level,
-        totalScore: testData.totalScore || 0,
+        totalScore: finalTotalScore,
         baseScore: testData.baseScore || 0,
         timeBonus: testData.timeBonus || 0,
         perfectBonus: testData.perfectBonus || 0,
@@ -510,12 +553,11 @@ class StudentService {
         isPerfect: testData.isPerfect || false,
         scoringVersion: "2.0",
       };
+
+      const newTestRef = testsCollectionRef.doc(testDocumentName);
+      await newTestRef.set(processedTestData);
+      return { id: newTestRef.id, ...processedTestData };
     }
-
-    const newTestRef = testsCollectionRef.doc(testDocumentName);
-    await newTestRef.set(processedTestData);
-
-    return { id: newTestRef.id, ...processedTestData };
   }
 
   async getFirstAndLastTestWithScoring(email) {
@@ -639,7 +681,6 @@ class StudentService {
       };
     }
 
-    // Process all tests to find the latest for each quiz type and the pre-assessment
     const preAssessmentTest = testsSnapshot.docs
       .find((doc) => doc.data().type === "pre-assessment")
       ?.data();
@@ -699,10 +740,9 @@ class StudentService {
     ];
     const competenceScores = {};
     const completedLevels = {};
-    const preAssessmentPointMapping = { C: 100, M: 50, B: 25, F: 0 };
+    const preAssessmentPointMapping = { C: 500, M: 500, B: 0, F: 0 };
     let allLevelsComplete = true;
 
-    // Initialize tracking
     competences.forEach((comp) => {
       competenceScores[comp] = { level1: 0, level2: 0, totalScore: 0 };
       completedLevels[comp] = {
@@ -711,21 +751,19 @@ class StudentService {
       };
     });
 
-    // Populate from pre-assessment
     if (preAssessmentTest) {
       (preAssessmentTest.grades || []).forEach((grade, index) => {
         const comp = competences[index];
         if (comp) {
-          competenceScores[comp].level1 +=
-            preAssessmentPointMapping[grade] || 0;
-          if (grade === "C") {
+          const points = preAssessmentPointMapping[grade] || 0;
+          competenceScores[comp].level1 += points;
+          if (grade === "M" || grade === "C") {
             completedLevels[comp].level1.perfected = true;
           }
         }
       });
     }
 
-    // Populate from latest quizzes
     quizzes.forEach((quiz) => {
       const comp = quiz.competenceArea;
       const levelKey = quiz.level === "basic" ? "level1" : "level2";
@@ -740,7 +778,6 @@ class StudentService {
       }
     });
 
-    // Final check for completion and total scores
     competences.forEach((comp) => {
       competenceScores[comp].totalScore =
         competenceScores[comp].level1 + competenceScores[comp].level2;
