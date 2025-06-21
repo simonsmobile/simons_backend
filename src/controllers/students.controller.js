@@ -180,4 +180,18 @@ router.post("/google-auth", async (req, res) => {
   }
 });
 
+router.get("/leaderboard/:email", async (req, res) => {
+  const { email } = req.params;
+
+  try {
+    const leaderboard = await StudentService.getLeaderboard(email);
+    res.status(httpStatus.OK).send(leaderboard);
+  } catch (error) {
+    console.error(error);
+    res.status(httpStatus.INTERNAL_SERVER_ERROR).send({
+      message: error.message || "Failed to get leaderboard",
+    });
+  }
+});
+
 module.exports = router;
