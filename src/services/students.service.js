@@ -3,12 +3,12 @@ const CryptoJS = require("crypto-js");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
+const LeaderboardService = require("./leaderboard.service");
 
 const SECRET_KEY = "jwt_secret";
 
 class StudentService {
   async createStudent(student) {
-    console.log(student);
     const querySnapshot = await studentCollection
       .where("email", "==", student.email)
       .get();
@@ -35,6 +35,14 @@ class StudentService {
       status: "Not Passed",
     };
     const studentRef = await studentCollection.add(newStudent);
+    try {
+      await LeaderboardService.initializeUserLeaderboard(
+        userData.email,
+        userData
+      );
+    } catch (leaderboardError) {
+      console.error("Error initializing leaderboard:", leaderboardError);
+    }
     return { id: studentRef.id, ...newStudent };
   }
 
@@ -302,13 +310,31 @@ class StudentService {
       throw new Error("Student not found");
     }
     const studentDoc = querySnapshot.docs[0];
+    const studentData = studentDoc.data();
     const testsCollectionRef = studentCollection
       .doc(studentDoc.id)
       .collection("tests");
     const testsSnapshot = await testsCollectionRef.get();
 
     if (testsSnapshot.empty) {
-      return { message: "No tests to reset." };
+      try {
+        await LeaderboardService.updateUserLeaderboard(email, {
+          name:
+            `${studentData?.firstName || ""} ${
+              studentData?.lastName || ""
+            }`.trim() || email.split("@")[0],
+          totalScore: 0,
+        });
+      } catch (leaderboardError) {
+        console.error(
+          "Error resetting leaderboard on empty tests:",
+          leaderboardError
+        );
+      }
+
+      return {
+        message: "No tests to reset, but leaderboard score reset to 0.",
+      };
     }
 
     const batch = admin.firestore().batch();
@@ -320,7 +346,25 @@ class StudentService {
 
     await studentCollection.doc(studentDoc.id).update({ status: "Not Passed" });
 
-    return { message: `Reset ${testsSnapshot.size} test(s) successfully.` };
+    try {
+      await LeaderboardService.updateUserLeaderboard(email, {
+        name:
+          `${studentData?.firstName || ""} ${
+            studentData?.lastName || ""
+          }`.trim() || email.split("@")[0],
+        totalScore: 0,
+      });
+      console.log(`Leaderboard score reset to 0 for ${email} after test reset`);
+    } catch (leaderboardError) {
+      console.error(
+        "Error resetting leaderboard after test deletion:",
+        leaderboardError
+      );
+    }
+
+    return {
+      message: `Reset ${testsSnapshot.size} test(s) successfully and leaderboard score reset to 0.`,
+    };
   }
 
   async getFirstAndLastTest(email) {
@@ -477,6 +521,24 @@ class StudentService {
         const testDocumentName = nextTestNumber.toString();
         const newTestRef = testsCollectionRef.doc(testDocumentName);
         await newTestRef.set(processedTestData);
+        try {
+          const updatedScore = await this.getTotalAccumulatedScore(email);
+
+          const userSnapshot = await studentCollection
+            .where("email", "==", email)
+            .get();
+          const userData = userSnapshot.docs[0]?.data();
+
+          await LeaderboardService.updateUserLeaderboard(email, {
+            name:
+              `${userData?.firstName || ""} ${
+                userData?.lastName || ""
+              }`.trim() || email.split("@")[0],
+            totalScore: updatedScore.totalScore,
+          });
+        } catch (leaderboardError) {
+          console.error("Error updating leaderboard:", leaderboardError);
+        }
         return { id: newTestRef.id, ...processedTestData };
       }
     } else {
@@ -556,6 +618,23 @@ class StudentService {
 
       const newTestRef = testsCollectionRef.doc(testDocumentName);
       await newTestRef.set(processedTestData);
+      try {
+        const updatedScore = await this.getTotalAccumulatedScore(email);
+
+        const userSnapshot = await studentCollection
+          .where("email", "==", email)
+          .get();
+        const userData = userSnapshot.docs[0]?.data();
+
+        await LeaderboardService.updateUserLeaderboard(email, {
+          name:
+            `${userData?.firstName || ""} ${userData?.lastName || ""}`.trim() ||
+            email.split("@")[0],
+          totalScore: updatedScore.totalScore,
+        });
+      } catch (leaderboardError) {
+        console.error("Error updating leaderboard:", leaderboardError);
+      }
       return { id: newTestRef.id, ...processedTestData };
     }
   }
@@ -797,6 +876,15 @@ class StudentService {
       grades: latestGrades,
       allLevelsComplete,
     };
+  }
+
+  async getLeaderboard(userEmail) {
+    try {
+      return await LeaderboardService.getLeaderboard(userEmail);
+    } catch (error) {
+      console.error("Error getting leaderboard:", error);
+      throw new Error("Failed to get leaderboard data");
+    }
   }
 }
 
