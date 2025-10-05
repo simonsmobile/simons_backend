@@ -593,10 +593,7 @@ class StudentService {
         }
       }
 
-      let finalTotalScore = 0;
-      if (testData.isPerfect) {
-        finalTotalScore = testData.totalScore || 0;
-      }
+      let finalTotalScore = testData.totalScore || 0;
 
       processedTestData = {
         date: testData.date || new Date().toISOString().split("T")[0],
@@ -763,23 +760,22 @@ class StudentService {
     const preAssessmentTest = testsSnapshot.docs
       .find((doc) => doc.data().type === "pre-assessment")
       ?.data();
-    const latestQuizzes = {};
+    const bestQuizzes = {};
 
     testsSnapshot.docs.forEach((doc) => {
       const testData = doc.data();
       if (testData.type === "quiz") {
         const key = `${testData.competenceArea}-${testData.level}`;
         if (
-          !latestQuizzes[key] ||
-          testData.timestamp.toMillis() >
-            latestQuizzes[key].timestamp.toMillis()
+          !bestQuizzes[key] ||
+          (testData.totalScore || 0) > (bestQuizzes[key].totalScore || 0)
         ) {
-          latestQuizzes[key] = testData;
+          bestQuizzes[key] = testData;
         }
       }
     });
 
-    const quizzes = Object.values(latestQuizzes);
+    const quizzes = Object.values(bestQuizzes);
     const totalQuizScore = quizzes.reduce(
       (sum, quiz) => sum + (quiz.totalScore || 0),
       0
